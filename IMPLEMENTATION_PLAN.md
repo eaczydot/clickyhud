@@ -95,6 +95,7 @@ The visual priority is **Clicky branding/assets first**, then adapt BoringNotch 
 ## Parallel Delivery Model
 
 To complete the implementation faster, work is organized into **four parallel tracks** with explicit dependency gates.
+All tracks **start on Day 1 in parallel**. Gates do not block starting work; gates only control integration/merge promotion.
 
 ### Track A — UX & Notch Shell
 **Scope:** Interaction model, component structure, and visual implementation.
@@ -146,6 +147,8 @@ To complete the implementation faster, work is organized into **four parallel tr
    - Required by Tracks A/C/D for consistent UI states and file attribution.
 4. **Gate G4 (Day 8): End-to-end integration branch cut**
    - All tracks merge behind flags for QA hardening.
+
+> **Parallel-first rule:** no track waits idle for another track. If a gate is not yet frozen, teams proceed with mocks/adapters and swap to final contracts at gate freeze.
 
 ---
 
@@ -204,6 +207,13 @@ To complete the implementation faster, work is organized into **four parallel tr
 
 ## Timeline (Parallelized)
 
+### Day 1 kickoff (all tracks begin in parallel)
+- Track A starts shell scaffold, keyboard handling, and UI states.
+- Track B starts schema drafting, websocket adapter, and mock event generator.
+- Track C starts command interfaces, result envelopes, and execution lifecycle.
+- Track D starts dropzone validation, stash copy service, and file activity model.
+- Deliverable by end of day: each track ships one vertical slice behind its feature flag.
+
 ### Week 1
 - Day 1–2:
   - Track A: Shell scaffold and interactions.
@@ -232,6 +242,12 @@ To complete the implementation faster, work is organized into **four parallel tr
 
 ### Week 3 (buffer / release prep)
 - Bug bash, regression fixes, rollout checks, staged enablement.
+
+### Daily parallel operating rhythm
+- 15-minute async standup per track before 10:00.
+- 30-minute cross-track contract sync (only blockers/contract changes).
+- End-of-day integration window: each track merges at least one PR behind flag.
+- If blocked >2 hours, escalate to tech lead for same-day decision.
 
 ---
 
