@@ -314,3 +314,63 @@ All tracks **start on Day 1 in parallel**. Gates do not block starting work; gat
 - [ ] Add integration tests for end-to-end shell/HUD interactions.
 - [ ] Add contract tests for event and command schemas.
 - [ ] Add rollout flags and staged-release checklist.
+
+---
+
+## Work Plan Completion Checklist
+
+Use this checklist to mark the plan as complete and execution-ready.
+
+### A. Planning artifacts complete
+- [ ] Event schemas drafted (`agent:*`, `files:*`, `stash:*`) with example fixtures.
+- [ ] Store contracts drafted (state shape, selectors, update semantics).
+- [ ] Command result schema drafted (success/error payloads + provenance fields).
+- [ ] Feature flag matrix documented (flag owner, default, rollback owner).
+
+### B. Parallel track kickoff complete
+- [ ] Track A has a merged vertical slice behind `notch_shell_v1`.
+- [ ] Track B has a merged vertical slice behind `agent_events_v1`.
+- [ ] Track C has a merged vertical slice behind `command_actions_v1`.
+- [ ] Track D has a merged vertical slice behind `stash_pipeline_v1`.
+
+### C. Gate readiness complete
+- [ ] G1 readiness review passed (event schema freeze artifacts approved).
+- [ ] G2 readiness review passed (shared store contracts and selector tests approved).
+- [ ] G3 readiness review passed (command schema and compatibility matrix approved).
+- [ ] G4 readiness review passed (end-to-end checklist + release report approved).
+
+### D. Quality and rollout readiness complete
+- [ ] Accessibility checklist passed for notch and HUD interactions.
+- [ ] Command reliability SLO measured and meets target.
+- [ ] Event freshness SLO measured and meets target.
+- [ ] Stash validation and rejection messaging verified.
+- [ ] Kill-switch rollback drill completed for each feature flag.
+
+### E. Launch decision complete
+- [ ] Internal dogfood signoff completed.
+- [ ] Limited beta metrics reviewed and approved.
+- [ ] GA rollout plan approved by engineering + product.
+
+---
+
+## Workstream Deliverables by Function
+
+### Engineering
+- Publish schemas/contracts to versioned folder and changelog.
+- Implement feature-flag guardrails and rollout toggles.
+- Ship contract tests in CI as required checks.
+
+### Design
+- Finalize Clicky token mapping for notch/HUD.
+- Approve interaction/motion specs for collapsed/expanded transitions.
+- Validate empty/loading/error visuals for all panels.
+
+### QA
+- Build scenario matrix for shell, commands, files, and stash flows.
+- Execute regression pass at each gate freeze.
+- Verify rollback triggers and failure-path UX copy.
+
+### Product/PM
+- Maintain gate calendar and risk log.
+- Track acceptance criteria completion per milestone.
+- Run go/no-go reviews for beta and GA.
