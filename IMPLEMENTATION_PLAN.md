@@ -9,6 +9,10 @@ Integrate `clicky` agent workflows into a `boring.notch`-inspired shell/HUD expe
 
 The visual priority is **Clicky branding/assets first**, then adapt BoringNotch interaction patterns to Clicky’s style system.
 
+This document is both:
+1. A **development execution plan** (tracks, milestones, ownership, rollout), and
+2. A **technical design plan** (architecture decisions, interfaces, schemas, failure handling, and validation).
+
 ---
 
 ## Product Scope (MVP)
@@ -90,6 +94,225 @@ The visual priority is **Clicky branding/assets first**, then adapt BoringNotch 
 - Persistent stash + recent-file index.
 - Optional retention policy (e.g., 7–30 days).
 
+### E) Security & Permissions Model
+- Command allowlist for page/save operations.
+- Explicit consent surfaces for URL/page capture actions.
+- Stash file validation with extension/MIME/size checks.
+- Audit metadata for command execution and stash ingestion.
+
+### F) Reliability & Failure Model
+- Event transport: reconnect with exponential backoff and jitter.
+- Idempotent file-change ingestion keyed by `(path, changeType, timestampBucket)`.
+- Command timeout + retry policy by command type.
+- Graceful degradation: fallback polling when event stream is unavailable.
+
+---
+
+## Technical Design Artifacts (Required)
+
+The following artifacts are required to treat this as a true technical design plan:
+
+1. **Architecture Decision Records (ADRs)**
+   - ADR-001: Event transport choice (websocket vs fallback polling behavior).
+   - ADR-002: Store architecture and selector contract strategy.
+   - ADR-003: Command execution/result envelope format.
+   - ADR-004: Stash ingestion pipeline and retention policy.
+
+2. **Interface Contracts**
+   - Event schemas for `agent:*`, `files:*`, `stash:*`.
+   - Command request/response schemas for all 3 save commands.
+   - Store interface contracts (state slices + selectors).
+
+3. **Sequence Diagrams**
+   - Save focused page flow.
+   - Save selected text flow.
+   - Save by URL flow.
+   - Drag/drop stash ingestion and agent availability notification flow.
+
+4. **Operational Readiness Artifacts**
+   - SLO definitions and alert thresholds.
+   - Runbook for event lag, command failures, and stash ingestion failures.
+   - Rollback runbook per feature flag.
+
+---
+
+## Parallel Delivery Model
+
+To complete the implementation faster, work is organized into **four parallel tracks** with explicit dependency gates.
+All tracks **start on Day 1 in parallel**. Gates do not block starting work; gates only control integration/merge promotion.
+
+### Track A — UX & Notch Shell
+**Scope:** Interaction model, component structure, and visual implementation.
+- Build `NotchShell` collapsed/expanded states.
+- Implement shortcut + focus management.
+- Apply Clicky design tokens and motion.
+- Integrate placeholders for Agent HUD, Recent Files, and Stash panels.
+
+**Primary outputs:**
+- `NotchShell`, shell layout primitives, keyboard interactions.
+
+### Track B — Agent Runtime + Events
+**Scope:** Data contracts and live event ingestion.
+- Define schemas for `agent:*`, `files:*`, `stash:*` events.
+- Build event adapter/websocket client.
+- Normalize runtime events into central store selectors.
+- Provide mock-event generator for local dev and tests.
+
+**Primary outputs:**
+- Event contract doc, event adapter, normalized store slices.
+
+### Track C — Commands + Artifacts
+**Scope:** Command execution and save workflows.
+- Implement `saveFocusedPage()`, `saveSelectedText()`, `savePageByUrl(url)`.
+- Add status lifecycle (`queued/running/success/error`) and per-command toasts.
+- Persist command artifacts and attach provenance (agent, timestamp, source).
+
+**Primary outputs:**
+- Command handlers, execution state machine, artifact metadata model.
+
+### Track D — Stash + File Activity
+**Scope:** File intake pipeline and recent changes surface.
+- Implement `StashDropzone` validation/copy pipeline.
+- Build recent-file ingestion, sorting/filtering, and preview metadata panel.
+- Emit/consume `stash:updated` and `files:changed` events.
+
+**Primary outputs:**
+- Stash service, recent-files panel, file event reducers.
+
+---
+
+## Dependency Gates (for Safe Parallelization)
+
+1. **Gate G1 (Day 2): Event schema freeze**
+   - Required by Tracks B/C/D before wiring live runtime behavior.
+2. **Gate G2 (Day 4): Shared store contract freeze**
+   - Required by Tracks A/B/C/D for stable integration.
+3. **Gate G3 (Day 6): Command result contract freeze**
+   - Required by Tracks A/C/D for consistent UI states and file attribution.
+4. **Gate G4 (Day 8): End-to-end integration branch cut**
+   - All tracks merge behind flags for QA hardening.
+
+> **Parallel-first rule:** no track waits idle for another track. If a gate is not yet frozen, teams proceed with mocks/adapters and swap to final contracts at gate freeze.
+
+---
+
+## Integration Strategy
+
+- Use **feature flags** per track (`notch_shell_v1`, `agent_events_v1`, `command_actions_v1`, `stash_pipeline_v1`).
+- Merge continuously into an integration branch after each gate.
+- Require contract tests at merge points:
+  - Event schema validation tests.
+  - Store selector compatibility tests.
+  - Command result contract tests.
+- Run daily 30-minute cross-track sync focused only on blockers/contract drift.
+
+---
+
+## Execution Details (to make parallel work actionable)
+
+### Owners and handoffs
+- **Track A owner (Frontend):** owns notch/HUD interaction and all UI states.
+- **Track B owner (Platform):** owns event contracts, transport, and store ingestion.
+- **Track C owner (Runtime):** owns command handlers and artifact lifecycle.
+- **Track D owner (Files):** owns stash intake, file indexing, and file preview metadata.
+- **Tech lead:** approves gate freezes (G1–G4) and resolves cross-track contract disputes within 24 hours.
+
+### Definition of done per track
+- **Track A (UX & Notch Shell):**
+  - Keyboard and pointer interactions pass accessibility checklist.
+  - Empty/loading/error states implemented for all shell surfaces.
+  - Feature flag supports instant rollback without app restart.
+- **Track B (Runtime + Events):**
+  - Schema validation enforces required fields on ingress.
+  - Reconnect/backoff behavior proven in local fault simulation.
+  - Store selectors documented and consumed by at least one UI workflow.
+- **Track C (Commands + Artifacts):**
+  - All three save commands produce standardized result envelopes.
+  - Failure states include actionable user messaging and retry path.
+  - Artifact provenance (agent/time/source) is persisted and queryable.
+- **Track D (Stash + File Activity):**
+  - Validation rejects unsupported types/sizes with clear reason.
+  - File-copy pipeline is non-blocking with progress indication.
+  - Recent-file list stays consistent under bursty update streams.
+
+### Contract artifacts required at each gate
+- **G1:** JSON schema files for event types, plus fixture examples.
+- **G2:** Central store interface signatures and selector contract tests.
+- **G3:** Command result schema + compatibility matrix for UI states.
+- **G4:** End-to-end scenario checklist and release-readiness report.
+
+### Weekly cross-track ceremony checklist
+- Review gate readiness and blocked contracts.
+- Confirm feature-flag defaults for staging and production.
+- Triage top 5 defects by user impact and integration risk.
+- Record decision log entries for any contract changes.
+
+---
+
+## Timeline (Parallelized)
+
+### Day 1 kickoff (all tracks begin in parallel)
+- Track A starts shell scaffold, keyboard handling, and UI states.
+- Track B starts schema drafting, websocket adapter, and mock event generator.
+- Track C starts command interfaces, result envelopes, and execution lifecycle.
+- Track D starts dropzone validation, stash copy service, and file activity model.
+- Deliverable by end of day: each track ships one vertical slice behind its feature flag.
+
+### Week 1
+- Day 1–2:
+  - Track A: Shell scaffold and interactions.
+  - Track B: Event schema and adapter scaffolding.
+  - Track C: Command interfaces and mock executor.
+  - Track D: Stash validation rules and file model.
+- Day 2: **G1 freeze**.
+- Day 3–4:
+  - Track A: HUD shell slotting + accessibility.
+  - Track B: Runtime ingestion into store.
+  - Track C: Implement focused-page + selected-text save.
+  - Track D: Recent-files panel with mock stream.
+- Day 4: **G2 freeze**.
+
+### Week 2
+- Day 5–6:
+  - Track C: Implement URL save + error handling.
+  - Track D: Persist stash + `stash:updated` wiring.
+  - Track A: Production loading/empty/error states.
+  - Track B: Reliability hardening + reconnect logic.
+- Day 6: **G3 freeze**.
+- Day 7–8:
+  - Cross-track integration, telemetry, and perf tuning.
+  - Accessibility pass and end-to-end scenarios.
+- Day 8: **G4 branch cut**.
+
+### Week 3 (buffer / release prep)
+- Bug bash, regression fixes, rollout checks, staged enablement.
+
+### Daily parallel operating rhythm
+- 15-minute async standup per track before 10:00.
+- 30-minute cross-track contract sync (only blockers/contract changes).
+- End-of-day integration window: each track merges at least one PR behind flag.
+- If blocked >2 hours, escalate to tech lead for same-day decision.
+
+---
+
+## Success Metrics and Rollout Controls
+
+### MVP success metrics
+- Notch open-to-action latency: **<150ms p95** on supported hardware.
+- Command completion success rate: **>98%** excluding explicit permission denies.
+- Event-to-UI freshness: **<1s p95** for `agent:*` and `files:*` updates.
+- Dropzone validation clarity: **100%** of rejections include a user-readable reason.
+
+### Rollout stages
+1. **Internal dogfood:** all flags on, telemetry required.
+2. **Limited beta cohort:** 10–20% exposure with command and stash monitoring.
+3. **General availability:** progressive rollout with kill-switch support per flag.
+
+### Rollback triggers
+- Command failure rate exceeds 5% for 15 minutes.
+- Event ingestion lag exceeds 3 seconds p95 for 15 minutes.
+- Crash rate regression >1% compared to baseline build.
+
 ---
 
 ## UX Priorities
@@ -97,47 +320,6 @@ The visual priority is **Clicky branding/assets first**, then adapt BoringNotch 
 2. **Clear provenance**: every saved artifact and changed file shows source agent and time.
 3. **Low visual noise**: collapsed notch remains minimal.
 4. **No style drift**: BoringNotch mechanics mapped to Clicky’s visual language.
-
----
-
-## Phased Delivery Plan
-
-### Phase 0 — Discovery & Mapping (1–2 days)
-- Inventory Clicky UI assets/components and layout primitives.
-- Map BoringNotch patterns to Clicky equivalents.
-- Define integration boundaries and extension points.
-
-### Phase 1 — Notch Shell Foundation (2–4 days)
-- Implement collapsed/expanded shell scaffold.
-- Add toggle shortcuts and motion primitives.
-- Wire static mock data for agents/recent files/actions.
-
-### Phase 2 — Agent HUD + Live Agent Data (3–5 days)
-- Build agent list + detail panel.
-- Connect to agent runtime events.
-- Add action feed and status updates.
-
-### Phase 3 — Recent File Tracking (2–4 days)
-- Integrate changed-file event ingestion.
-- Add filtering/sorting and quick open behavior.
-- Provide file metadata preview panel.
-
-### Phase 4 — Command Actions (2–4 days)
-- Implement save-focused-page command.
-- Implement save-selected-text command.
-- Implement save-page-by-url workflow.
-- Add run-state indicators and error handling.
-
-### Phase 5 — Drag/Drop Stash (2–4 days)
-- Implement dropzone + file validation.
-- Persist stash entries.
-- Emit `stash:updated` events for agent availability.
-
-### Phase 6 — Polish, QA, and Hardening (3–5 days)
-- Accessibility pass (keyboard, screen reader labels).
-- Performance profiling for notch open/close and feed updates.
-- Empty/error/loading states.
-- Telemetry + usage metrics.
 
 ---
 
@@ -160,6 +342,8 @@ The visual priority is **Clicky branding/assets first**, then adapt BoringNotch 
   **Mitigation:** explicit permission prompts and allowlist rules.
 - **Risk:** Drag/drop large files impacts responsiveness.  
   **Mitigation:** background processing + size caps + progress UI.
+- **Risk:** Parallel tracks drift in interface assumptions.  
+  **Mitigation:** enforce gate freezes + contract tests as merge criteria.
 
 ---
 
@@ -172,3 +356,97 @@ The visual priority is **Clicky branding/assets first**, then adapt BoringNotch 
 - [ ] Implement `StashDropzone` and stash explorer.
 - [ ] Add unit tests for command handlers.
 - [ ] Add integration tests for end-to-end shell/HUD interactions.
+- [ ] Add contract tests for event and command schemas.
+- [ ] Add rollout flags and staged-release checklist.
+
+---
+
+## Work Plan Completion Checklist
+
+Use this checklist to mark the plan as complete and execution-ready.
+
+### A. Planning artifacts complete
+- [ ] Event schemas drafted (`agent:*`, `files:*`, `stash:*`) with example fixtures.
+- [ ] Store contracts drafted (state shape, selectors, update semantics).
+- [ ] Command result schema drafted (success/error payloads + provenance fields).
+- [ ] Feature flag matrix documented (flag owner, default, rollback owner).
+
+### B. Parallel track kickoff complete
+- [ ] Track A has a merged vertical slice behind `notch_shell_v1`.
+- [ ] Track B has a merged vertical slice behind `agent_events_v1`.
+- [ ] Track C has a merged vertical slice behind `command_actions_v1`.
+- [ ] Track D has a merged vertical slice behind `stash_pipeline_v1`.
+
+### C. Gate readiness complete
+- [ ] G1 readiness review passed (event schema freeze artifacts approved).
+- [ ] G2 readiness review passed (shared store contracts and selector tests approved).
+- [ ] G3 readiness review passed (command schema and compatibility matrix approved).
+- [ ] G4 readiness review passed (end-to-end checklist + release report approved).
+
+### D. Quality and rollout readiness complete
+- [ ] Accessibility checklist passed for notch and HUD interactions.
+- [ ] Command reliability SLO measured and meets target.
+- [ ] Event freshness SLO measured and meets target.
+- [ ] Stash validation and rejection messaging verified.
+- [ ] Kill-switch rollback drill completed for each feature flag.
+
+### E. Launch decision complete
+- [ ] Internal dogfood signoff completed.
+- [ ] Limited beta metrics reviewed and approved.
+- [ ] GA rollout plan approved by engineering + product.
+
+---
+
+## Workstream Deliverables by Function
+
+### Engineering
+- Publish schemas/contracts to versioned folder and changelog.
+- Implement feature-flag guardrails and rollout toggles.
+- Ship contract tests in CI as required checks.
+
+### Design
+- Finalize Clicky token mapping for notch/HUD.
+- Approve interaction/motion specs for collapsed/expanded transitions.
+- Validate empty/loading/error visuals for all panels.
+
+### QA
+- Build scenario matrix for shell, commands, files, and stash flows.
+- Execute regression pass at each gate freeze.
+- Verify rollback triggers and failure-path UX copy.
+
+### Product/PM
+- Maintain gate calendar and risk log.
+- Track acceptance criteria completion per milestone.
+- Run go/no-go reviews for beta and GA.
+
+---
+
+## Parallel Implementation Prompt (Kickoff + Completion)
+
+Use this prompt to start and drive execution to completion in parallel:
+
+> You are the implementation team for Clicky + BoringNotch HUD integration.  
+> Execute all four tracks in parallel starting Day 1:
+> 1) Track A (UX & Notch Shell), 2) Track B (Runtime & Events), 3) Track C (Commands & Artifacts), 4) Track D (Stash & File Activity).  
+>  
+> Constraints:
+> - Use feature flags: `notch_shell_v1`, `agent_events_v1`, `command_actions_v1`, `stash_pipeline_v1`.
+> - Do not wait idle for other tracks; use mocks/adapters until gates freeze.
+> - Enforce gate artifacts:
+>   - G1: event schemas + fixtures
+>   - G2: store contracts + selector tests
+>   - G3: command result schema + compatibility matrix
+>   - G4: end-to-end checklist + release report
+> - Produce technical design artifacts: ADRs, sequence diagrams, interface contracts, and runbooks.
+> - Merge at least one PR per track per day behind flags.
+> - Escalate blockers >2 hours to tech lead.
+>  
+> Success criteria:
+> - Meet MVP acceptance criteria in this plan.
+> - Meet SLO/metrics targets for latency, success rate, and freshness.
+> - Complete rollout stages (dogfood → beta → GA) with rollback drills passed.
+>  
+> Output required at end of each day:
+> - Per-track status, risks, and blockers.
+> - Gate readiness scorecard (G1–G4).
+> - Links to merged PRs, tests, and updated artifacts.
