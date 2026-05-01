@@ -9,6 +9,10 @@ Integrate `clicky` agent workflows into a `boring.notch`-inspired shell/HUD expe
 
 The visual priority is **Clicky branding/assets first**, then adapt BoringNotch interaction patterns to Clicky’s style system.
 
+This document is both:
+1. A **development execution plan** (tracks, milestones, ownership, rollout), and
+2. A **technical design plan** (architecture decisions, interfaces, schemas, failure handling, and validation).
+
 ---
 
 ## Product Scope (MVP)
@@ -89,6 +93,46 @@ The visual priority is **Clicky branding/assets first**, then adapt BoringNotch 
 - Session-local stores for transient UI state.
 - Persistent stash + recent-file index.
 - Optional retention policy (e.g., 7–30 days).
+
+### E) Security & Permissions Model
+- Command allowlist for page/save operations.
+- Explicit consent surfaces for URL/page capture actions.
+- Stash file validation with extension/MIME/size checks.
+- Audit metadata for command execution and stash ingestion.
+
+### F) Reliability & Failure Model
+- Event transport: reconnect with exponential backoff and jitter.
+- Idempotent file-change ingestion keyed by `(path, changeType, timestampBucket)`.
+- Command timeout + retry policy by command type.
+- Graceful degradation: fallback polling when event stream is unavailable.
+
+---
+
+## Technical Design Artifacts (Required)
+
+The following artifacts are required to treat this as a true technical design plan:
+
+1. **Architecture Decision Records (ADRs)**
+   - ADR-001: Event transport choice (websocket vs fallback polling behavior).
+   - ADR-002: Store architecture and selector contract strategy.
+   - ADR-003: Command execution/result envelope format.
+   - ADR-004: Stash ingestion pipeline and retention policy.
+
+2. **Interface Contracts**
+   - Event schemas for `agent:*`, `files:*`, `stash:*`.
+   - Command request/response schemas for all 3 save commands.
+   - Store interface contracts (state slices + selectors).
+
+3. **Sequence Diagrams**
+   - Save focused page flow.
+   - Save selected text flow.
+   - Save by URL flow.
+   - Drag/drop stash ingestion and agent availability notification flow.
+
+4. **Operational Readiness Artifacts**
+   - SLO definitions and alert thresholds.
+   - Runbook for event lag, command failures, and stash ingestion failures.
+   - Rollback runbook per feature flag.
 
 ---
 
@@ -374,3 +418,35 @@ Use this checklist to mark the plan as complete and execution-ready.
 - Maintain gate calendar and risk log.
 - Track acceptance criteria completion per milestone.
 - Run go/no-go reviews for beta and GA.
+
+---
+
+## Parallel Implementation Prompt (Kickoff + Completion)
+
+Use this prompt to start and drive execution to completion in parallel:
+
+> You are the implementation team for Clicky + BoringNotch HUD integration.  
+> Execute all four tracks in parallel starting Day 1:
+> 1) Track A (UX & Notch Shell), 2) Track B (Runtime & Events), 3) Track C (Commands & Artifacts), 4) Track D (Stash & File Activity).  
+>  
+> Constraints:
+> - Use feature flags: `notch_shell_v1`, `agent_events_v1`, `command_actions_v1`, `stash_pipeline_v1`.
+> - Do not wait idle for other tracks; use mocks/adapters until gates freeze.
+> - Enforce gate artifacts:
+>   - G1: event schemas + fixtures
+>   - G2: store contracts + selector tests
+>   - G3: command result schema + compatibility matrix
+>   - G4: end-to-end checklist + release report
+> - Produce technical design artifacts: ADRs, sequence diagrams, interface contracts, and runbooks.
+> - Merge at least one PR per track per day behind flags.
+> - Escalate blockers >2 hours to tech lead.
+>  
+> Success criteria:
+> - Meet MVP acceptance criteria in this plan.
+> - Meet SLO/metrics targets for latency, success rate, and freshness.
+> - Complete rollout stages (dogfood → beta → GA) with rollback drills passed.
+>  
+> Output required at end of each day:
+> - Per-track status, risks, and blockers.
+> - Gate readiness scorecard (G1–G4).
+> - Links to merged PRs, tests, and updated artifacts.
