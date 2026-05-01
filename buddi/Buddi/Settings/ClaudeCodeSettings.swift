@@ -5,7 +5,7 @@ import SwiftUI
 struct ClaudeCodeSettings: View {
     @State private var hooksInstalled = HookInstaller.isInstalled()
     @State private var selectedSound = BuddiSettings.notificationSound
-    @ObservedObject private var usageService = UsageService.shared
+    @ObservedObject private var clickyRuntime = ClickySessionAdapter.shared
     @ObservedObject private var buddyManager = BuddyManager.shared
     @Default(.buddySpeciesOverride) private var speciesOverride
     @Default(.buddyEyeOverride) private var eyeOverride
@@ -36,7 +36,7 @@ struct ClaudeCodeSettings: View {
         Form {
             Section {
                 HStack {
-                    Text("Claude Code Hooks")
+                    Text("Clicky hooks")
                     Spacer()
                     if hooksInstalled {
                         HStack(spacing: 4) {
@@ -55,7 +55,7 @@ struct ClaudeCodeSettings: View {
             } header: {
                 Text("Integration")
             } footer: {
-                Text("Forwards Claude Code events to Buddi via Unix socket.")
+                Text("Forwards local session events to Clicky through the app socket.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -75,7 +75,7 @@ struct ClaudeCodeSettings: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("Plays when Claude finishes and is ready for input.")
+                Text("Plays when an agent finishes and is ready for input.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -93,24 +93,56 @@ struct ClaudeCodeSettings: View {
                 }
 
                 HStack {
-                    Text("Usage tracking")
+                    Text("Voice")
                     Spacer()
-                    if usageService.isAvailable {
-                        HStack(spacing: 4) {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("Connected")
-                                .foregroundStyle(.secondary)
-                        }
-                    } else {
-                        Text("Not available")
-                            .foregroundStyle(.secondary)
-                    }
+                    Text(clickyRuntime.voiceState.title)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Model")
+                    Spacer()
+                    Text(clickyRuntime.selectedModel)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                HStack {
+                    Text("Worker")
+                    Spacer()
+                    Text(clickyRuntime.workerStatusText)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                HStack {
+                    Text("Endpoints")
+                    Spacer()
+                    Text(clickyRuntime.workerEndpointSummary)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Cursor overlay")
+                    Spacer()
+                    Text(clickyRuntime.isClickyCursorEnabled
+                         ? (clickyRuntime.isCursorOverlayVisible ? "Visible" : "Ready")
+                         : "Off")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Permissions")
+                    Spacer()
+                    Text(clickyRuntime.permissions.summary)
+                        .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Status")
+                Text("Runtime")
             } footer: {
-                Text("OAuth login required for plan usage display.")
+                Text("Worker secrets stay outside the app. Clicky stores only the base URL and local preferences.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -118,9 +150,9 @@ struct ClaudeCodeSettings: View {
             Section {
                 buddyPreview
             } header: {
-                Text("Buddy")
+                Text("Clicky")
             } footer: {
-                Text("Customize your buddy's appearance. Changes apply everywhere — notch, lock screen, and panels.")
+                Text("Customize Clicky's appearance. Changes apply everywhere — notch, lock screen, and panels.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -162,7 +194,7 @@ struct ClaudeCodeSettings: View {
                         rarityOverride = nil
                     }
                 } footer: {
-                    Text("Restore your buddy's original randomly-assigned appearance.")
+                    Text("Restore Clicky's original randomly-assigned appearance.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -179,7 +211,7 @@ struct ClaudeCodeSettings: View {
                 } header: {
                     Text("cmux")
                 } footer: {
-                    Text("To send messages from Buddi to cmux sessions, set Socket Control Mode to \"Automation mode\" in cmux Settings > Automation. This allows Buddi to communicate with cmux's Unix socket.")
+                    Text("To send messages from Clicky to cmux sessions, set Socket Control Mode to \"Automation mode\" in cmux Settings > Automation. This allows Clicky to communicate with cmux's Unix socket.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

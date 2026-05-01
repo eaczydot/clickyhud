@@ -30,7 +30,7 @@ struct SettingsView: View {
                     Label("General", systemImage: "gear")
                 }
                 NavigationLink(value: "claudeCode") {
-                    Label("Claude Code", systemImage: "terminal")
+                    Label("Clicky Runtime", systemImage: "cursorarrow.motionlines")
                 }
                 NavigationLink(value: "Appearance") {
                     Label("Appearance", systemImage: "eye")
@@ -1382,7 +1382,7 @@ struct Appearance: View {
 
             Section {
                 Defaults.Toggle(key: .showMirror) {
-                    Text("Enable Buddi mirror")
+                    Text("Enable Clicky mirror")
                 }
                     .disabled(!checkVideoInput())
                 Picker("Mirror shape", selection: $mirrorShape) {

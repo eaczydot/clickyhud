@@ -9,6 +9,8 @@ APP_PATH="$DERIVED_DATA/Build/Products/Debug/buddi.app"
 cd "$ROOT_DIR"
 
 pkill -9 -f "$APP_PATH" >/dev/null 2>&1 || true
+pkill -9 -f "/Applications/Clicky.app/Contents/MacOS/Clicky" >/dev/null 2>&1 || true
+pkill -9 -x Clicky >/dev/null 2>&1 || true
 pkill -9 -x BuddiXPCHelper >/dev/null 2>&1 || true
 pkill -9 -x buddi >/dev/null 2>&1 || true
 
@@ -26,5 +28,9 @@ xcodebuild \
 if [[ "${1:-}" == "--verify" ]]; then
   sleep 1
   pgrep -x buddi >/dev/null
-  echo "buddi launched"
+  if pgrep -x Clicky >/dev/null; then
+    echo "another Clicky process is still running" >&2
+    exit 1
+  fi
+  echo "Clicky launched"
 fi

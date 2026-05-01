@@ -28,7 +28,7 @@ struct BuddiApp: App {
     }
 
     var body: some Scene {
-        MenuBarExtra("Buddi", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
+        MenuBarExtra("Clicky", systemImage: "sparkle", isInserted: $showMenuBarIcon) {
             Button("Settings") {
                 DispatchQueue.main.async {
                     SettingsWindowController.shared.showWindow()
@@ -37,7 +37,7 @@ struct BuddiApp: App {
             .keyboardShortcut(KeyEquivalent(","), modifiers: .command)
             CheckForUpdatesView(updater: updaterController.updater)
             Divider()
-            Button("Restart Buddi") {
+            Button("Restart Clicky") {
                 ApplicationRelauncher.restart()
             }
             Button("Quit", role: .destructive) {
@@ -478,13 +478,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         previousScreens = NSScreen.screens
         HookInstaller.installIfNeeded()
         BuddiSessionBridge.shared.startMonitoring()
-        UsageService.shared.startPolling()
-
-
-
-
-
-
     }
 
     func playWelcomeSound() {

@@ -57,7 +57,7 @@ struct OnboardingView: View {
                 PermissionRequestView(
                     icon: Image(systemName: "camera.fill"),
                     title: "Enable Camera Access",
-                    description: "Buddi includes a mirror feature that lets you quickly check your appearance using your camera, right from the notch. Camera access is required only to show this live preview. You can turn the mirror feature on or off at any time in the app.",
+                    description: "Clicky includes a mirror feature that lets you quickly check your appearance using your camera, right from the notch. Camera access is required only to show this live preview. You can turn the mirror feature on or off at any time in the app.",
                     privacyNote: "Your camera is never used without your consent, and nothing is recorded or stored.",
                     onAllow: {
                         Task {
@@ -79,7 +79,7 @@ struct OnboardingView: View {
                 PermissionRequestView(
                     icon: Image(systemName: "calendar"),
                     title: "Enable Calendar Access",
-                    description: "Buddi can show all your upcoming events in one place. Access to your calendar is needed to display your schedule.",
+                    description: "Clicky can show all your upcoming events in one place. Access to your calendar is needed to display your schedule.",
                     privacyNote: "Your calendar data is only used to show your events and is never shared.",
                     onAllow: {
                         Task {
@@ -101,7 +101,7 @@ struct OnboardingView: View {
                     PermissionRequestView(
                         icon: Image(systemName: "checklist"),
                         title: "Enable Reminders Access",
-                        description: "Buddi can show your scheduled reminders alongside your calendar events. Access to Reminders is needed to display your reminders.",
+                        description: "Clicky can show your scheduled reminders alongside your calendar events. Access to Reminders is needed to display your reminders.",
                         privacyNote: "Your reminders data is only used to show your reminders and is never shared.",
                         onAllow: {
                             Task {
@@ -123,7 +123,7 @@ struct OnboardingView: View {
                 PermissionRequestView(
                     icon: Image(systemName: "hand.raised.fill"),
                     title: "Enable Accessibility Access",
-                    description: "Accessibility access is required to replace system notifications with the Buddi HUD. This allows the app to intercept media and brightness events to display custom HUD overlays.",
+                    description: "Accessibility access is required to replace system notifications with the Clicky HUD. This allows the app to intercept media and brightness events to display custom HUD overlays.",
                     privacyNote: "Accessibility access is used only to improve media and brightness notifications. No data is collected or shared.",
                     onAllow: {
                         Task {
@@ -241,11 +241,11 @@ struct HooksInstallOnboardingView: View {
                 .foregroundColor(.effectiveAccent)
                 .padding(.top, 32)
 
-            Text("Connect to Claude Code")
+            Text("Connect Clicky Runtime")
                 .font(.title)
                 .fontWeight(.semibold)
 
-            Text("Install hooks to let Buddi monitor your Claude Code sessions, show approval requests, and track usage.")
+            Text("Install hooks to let Clicky monitor sessions, show approval requests, and surface runtime state.")
                 .multilineTextAlignment(.center)
                 .padding(.horizontal)
 
@@ -271,7 +271,7 @@ struct HooksInstallOnboardingView: View {
             HStack(spacing: 8) {
                 Image(systemName: "lock.shield")
                     .foregroundStyle(.secondary)
-                Text("Hooks only send session events to Buddi. No data leaves your machine.")
+                Text("Hooks only send session events to Clicky. No data leaves your machine.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.leading)

@@ -4,7 +4,7 @@ struct BuddyTabView: View {
     @EnvironmentObject var vm: BuddiViewModel
     @ObservedObject private var bridge = BuddiSessionBridge.shared
     @ObservedObject private var panelVM = BuddiSessionBridge.shared.panelViewModel
-    @ObservedObject private var usageService = UsageService.shared
+    @ObservedObject private var clickyRuntime = ClickySessionAdapter.shared
     @State private var suppressionToken = UUID()
     @State private var isSuppressing = false
 
@@ -52,28 +52,11 @@ struct BuddyTabView: View {
                 )
 
                 Text(BuddyManager.shared.effectiveIdentity.name
-                     ?? BuddyManager.shared.effectiveIdentity.species.rawValue.capitalized)
+                     ?? "Clicky")
                     .font(.caption2.weight(.medium).monospaced())
                     .foregroundColor(Color(nsColor: BuddyManager.shared.effectiveIdentity.rarity.nsColor).opacity(0.8))
 
-                if usageService.isAvailable {
-                    if let fh = usageService.usage.fiveHour {
-                        UsageBar(
-                            label: "Session",
-                            percent: fh.utilization / 100,
-                            detail: "\(Int(fh.utilization))%",
-                            color: fh.utilization > 80 ? .red : fh.utilization > 60 ? .yellow : Color(red: 0.35, green: 0.55, blue: 1.0)
-                        )
-                    }
-                    if let sd = usageService.usage.sevenDay {
-                        UsageBar(
-                            label: "Weekly",
-                            percent: sd.utilization / 100,
-                            detail: "\(Int(sd.utilization))%",
-                            color: sd.utilization > 80 ? .red : sd.utilization > 60 ? .yellow : Color(red: 0.35, green: 0.55, blue: 1.0)
-                        )
-                    }
-                }
+                ClickyRuntimeSummary(runtime: clickyRuntime, sessions: sessions)
             }
             .frame(width: 100)
 
@@ -119,33 +102,64 @@ struct BuddyTabView: View {
     }
 }
 
-struct UsageBar: View {
-    let label: String
-    let percent: Double
-    let detail: String
-    let color: Color
+private struct ClickyRuntimeSummary: View {
+    @ObservedObject var runtime: ClickySessionAdapter
+    let sessions: [SessionState]
+
+    private var clickySessions: [SessionState] {
+        sessions.filter { ClickySessionAdapter.shared.isClickySession($0.sessionId) }
+    }
+
+    private var activeClickyCount: Int {
+        clickySessions.filter { $0.phase.isActive || $0.phase.needsAttention }.count
+    }
+
+    private var latestSnippet: String? {
+        runtime.latestTranscript ?? runtime.latestResponse
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label)
-                    .font(.caption)
+        VStack(alignment: .leading, spacing: 4) {
+            RuntimeMetricRow(label: "Voice", detail: runtime.voiceState.title)
+            RuntimeMetricRow(label: "Agents", detail: "\(activeClickyCount)/\(max(clickySessions.count, runtime.activeAgentCount))")
+            RuntimeMetricRow(label: "Model", detail: runtime.selectedModel)
+            RuntimeMetricRow(label: "Worker", detail: runtime.workerStatusText)
+            RuntimeMetricRow(
+                label: "Cursor",
+                detail: runtime.isClickyCursorEnabled
+                    ? (runtime.isCursorOverlayVisible ? "Visible" : "Ready")
+                    : "Off"
+            )
+            RuntimeMetricRow(label: "Perms", detail: runtime.permissions.summary)
+
+            if let snippet = latestSnippet, !snippet.isEmpty {
+                Text(snippet)
+                    .font(.system(size: 9, weight: .regular, design: .rounded))
                     .foregroundStyle(.secondary)
-                Spacer()
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
             }
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(Color.white.opacity(0.08))
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(color)
-                        .frame(width: max(0, geo.size.width * percent))
-                }
-            }
-            .frame(height: 4)
+        }
+        .padding(.top, 3)
+    }
+}
+
+private struct RuntimeMetricRow: View {
+    let label: String
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text(label)
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 2)
+            Text(detail)
+                .font(.system(size: 9, weight: .medium, design: .rounded))
+                .foregroundColor(Color(red: 0.35, green: 0.55, blue: 1.0))
+                .lineLimit(1)
+                .truncationMode(.middle)
         }
     }
 }

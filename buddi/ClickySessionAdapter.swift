@@ -1,5 +1,48 @@
 import Combine
+import ApplicationServices
+import AVFoundation
+import CoreGraphics
 import Foundation
+
+enum ClickyVoiceState: String {
+    case idle
+    case listening
+    case processing
+    case responding
+
+    var title: String {
+        switch self {
+        case .idle:
+            return "Idle"
+        case .listening:
+            return "Listening"
+        case .processing:
+            return "Processing"
+        case .responding:
+            return "Responding"
+        }
+    }
+}
+
+struct ClickyPermissionState: Equatable {
+    var hasAccessibilityPermission = false
+    var hasScreenRecordingPermission = false
+    var hasMicrophonePermission = false
+    var hasScreenContentPermission = false
+
+    var grantedCount: Int {
+        [
+            hasAccessibilityPermission,
+            hasScreenRecordingPermission,
+            hasMicrophonePermission,
+            hasScreenContentPermission
+        ].filter { $0 }.count
+    }
+
+    var summary: String {
+        "\(grantedCount)/4 granted"
+    }
+}
 
 @MainActor
 final class ClickySessionAdapter: ObservableObject {
@@ -49,33 +92,55 @@ final class ClickySessionAdapter: ObservableObject {
 
     private var agents: [ClickyAgentTranscript] = []
     private var timer: Timer?
-    private var tick = 0
+    private var transientVoiceStateExpiresAt: Date?
+
+    @Published private(set) var voiceState: ClickyVoiceState = .idle
+    @Published private(set) var activeAgentCount = 0
+    @Published private(set) var selectedModel: String = "claude-sonnet-4-6"
+    @Published private(set) var workerBaseURL: String?
+    @Published private(set) var isClickyCursorEnabled = true
+    @Published private(set) var isCursorOverlayVisible = false
+    @Published private(set) var latestTranscript: String?
+    @Published private(set) var latestResponse: String?
+    @Published private(set) var permissions = ClickyPermissionState()
+
+    var workerStatusText: String {
+        guard let workerBaseURL, !workerBaseURL.isEmpty else {
+            return "Worker not configured"
+        }
+        return URL(string: workerBaseURL)?.host ?? workerBaseURL
+    }
+
+    var workerEndpointSummary: String {
+        "/chat /tts /transcribe-token"
+    }
+
+    private static let defaultSelectedModel = "claude-sonnet-4-6"
+    private static let workerBaseURLKey = "clickyWorkerBaseURL"
+    private static let selectedModelKey = "selectedClaudeModel"
+    private static let clickyCursorEnabledKey = "isClickyCursorEnabled"
+    private static let screenContentPermissionKey = "hasScreenContentPermission"
 
     private init() {}
 
     func start() {
         guard timer == nil else { return }
+        refreshRuntimeState()
         agents = [
             ClickyAgentTranscript(
-                sessionId: "clicky-agent-scout",
-                name: "Clicky Scout",
+                sessionId: "clicky-agent-companion",
+                name: "Clicky Companion",
                 phase: .waitingForInput,
-                userMessages: ["Watch this screen and help me understand what to do next."],
-                agentOutputs: ["Scout is watching the screen, ready to point at relevant UI."]
-            ),
-            ClickyAgentTranscript(
-                sessionId: "clicky-agent-builder",
-                name: "Clicky Builder",
-                phase: .processing,
-                userMessages: ["Prepare a patch and narrate the important output."],
-                agentOutputs: ["Builder is processing the active task and will stream output into the notch."]
+                userMessages: [],
+                agentOutputs: ["Clicky is ready. Hold Control+Option to talk, or configure the worker URL to enable voice runtime calls."]
             )
         ]
         publishAgents()
 
-        timer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
-                self?.advanceDemoAgentState()
+                self?.refreshRuntimeState()
+                self?.publishAgents()
             }
         }
     }
@@ -95,6 +160,7 @@ final class ClickySessionAdapter: ObservableObject {
             agentOutputs: ["Launching pointer and preparing the conversation stream."]
         )
         agents.append(agent)
+        setTransientVoiceState(.processing)
         publishAgents()
     }
 
@@ -103,6 +169,9 @@ final class ClickySessionAdapter: ObservableObject {
         agents[index].phase = .processing
         agents[index].userMessages.append(message)
         agents[index].agentOutputs.append("Clicky received: \(message). The active agent output is now streaming through the notch.")
+        latestTranscript = message
+        latestResponse = agents[index].lastAgentOutput
+        setTransientVoiceState(.responding)
         publishAgents()
     }
 
@@ -110,18 +179,40 @@ final class ClickySessionAdapter: ObservableObject {
         sessionId.hasPrefix("clicky-agent-")
     }
 
-    private func advanceDemoAgentState() {
-        guard !agents.isEmpty else { return }
-        tick += 1
-        let activeIndex = tick % agents.count
-        for index in agents.indices {
-            agents[index].phase = index == activeIndex ? .processing : .waitingForInput
+    private func setTransientVoiceState(_ state: ClickyVoiceState) {
+        voiceState = state
+        transientVoiceStateExpiresAt = Date().addingTimeInterval(2.5)
+    }
+
+    private func refreshRuntimeState() {
+        selectedModel = UserDefaults.standard.string(forKey: Self.selectedModelKey) ?? Self.defaultSelectedModel
+        workerBaseURL = UserDefaults.standard.string(forKey: Self.workerBaseURLKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        isClickyCursorEnabled = UserDefaults.standard.object(forKey: Self.clickyCursorEnabledKey) == nil
+            ? true
+            : UserDefaults.standard.bool(forKey: Self.clickyCursorEnabledKey)
+
+        let permissionState = ClickyPermissionState(
+            hasAccessibilityPermission: AXIsProcessTrusted(),
+            hasScreenRecordingPermission: CGPreflightScreenCaptureAccess(),
+            hasMicrophonePermission: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+            hasScreenContentPermission: UserDefaults.standard.bool(forKey: Self.screenContentPermissionKey)
+        )
+        permissions = permissionState
+        isCursorOverlayVisible = isClickyCursorEnabled && permissionState.grantedCount == 4
+
+        if let transientVoiceStateExpiresAt, Date() >= transientVoiceStateExpiresAt {
+            voiceState = .idle
+            self.transientVoiceStateExpiresAt = nil
         }
-        agents[activeIndex].agentOutputs.append("Output \(tick): Clicky agent pointer moved, captured context, and updated the notch.")
-        publishAgents()
     }
 
     private func publishAgents() {
+        refreshRuntimeState()
+        activeAgentCount = agents.filter { $0.phase.isActive || $0.phase.needsAttention }.count
+        latestTranscript = agents.last?.lastUserMessage ?? latestTranscript
+        latestResponse = agents.last?.lastAgentOutput ?? latestResponse
+
         for agent in agents {
             Task {
                 await SessionStore.shared.upsertClickyAgentSession(
