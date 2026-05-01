@@ -87,7 +87,9 @@ final class BuddiSessionBridge: ObservableObject {
     }
 
     private func handleWaitingForInputSessions(_ instances: [SessionState]) {
-        let waitingSessions = instances.filter { $0.phase == .waitingForInput }
+        let waitingSessions = instances.filter {
+            $0.phase == .waitingForInput && !ClickySessionAdapter.shared.isClickySession($0.sessionId)
+        }
         let currentWaitingSessionIDs = Set(waitingSessions.map { $0.sessionId })
 
         defer {
